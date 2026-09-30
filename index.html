@@ -49,11 +49,13 @@ input[type=number]{width:100%}
   <h2>Images <span id="count"></span></h2>
   <div class="row">
     <button class="p" id="add">Add images</button>
+    <button class="p" id="addc">Add CBZ/CBR</button>
     <button id="az">Sort A→Z</button>
     <button id="za">Sort Z→A</button>
     <button id="clear">Clear</button>
   </div>
-  <input type="file" id="file" accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp,.cbz,.cbr,.zip,.rar" multiple hidden>
+  <input type="file" id="file" accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp" multiple hidden>
+  <input type="file" id="filec" multiple hidden>
   <div id="list"><div id="empty">No images yet</div></div>
 </section>
 
@@ -191,6 +193,8 @@ $('#az').onclick = () => sortBy(1);
 $('#za').onclick = () => sortBy(-1);
 $('#clear').onclick = () => { items = []; render(); };
 $('#add').onclick = () => $('#file').click();
+$('#addc').onclick = () => $('#filec').click();  // no accept filter: iOS greys out .cbz/.cbr otherwise
+$('#filec').onchange = e => { addFiles([...e.target.files]); e.target.value = ''; };
 $('#file').onchange = e => { addFiles([...e.target.files]); e.target.value = ''; };
 
 // margins / UI state

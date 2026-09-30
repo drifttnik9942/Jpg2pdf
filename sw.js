@@ -1,4 +1,4 @@
-const CACHE = 'jpeg2pdf-v3';
+const CACHE = 'jpeg2pdf-v4';
 const FILES = ['./', 'index.html', 'manifest.webmanifest', 'fflate.min.js', 'icon-192.png', 'icon-512.png', 'icon-180.png'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES))); self.skipWaiting(); });
 self.addEventListener('activate', e => e.waitUntil(
