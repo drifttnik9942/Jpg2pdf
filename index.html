@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>JPEG to PDF</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<meta name="theme-color" content="#2563eb">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="JPEG→PDF">
+<style>
+:root{--bg:#f4f5f7;--card:#fff;--fg:#111827;--mut:#6b7280;--bd:#d9dce1;--ac:#2563eb}
+@media(prefers-color-scheme:dark){:root{--bg:#0f1115;--card:#1a1d23;--fg:#f3f4f6;--mut:#9ca3af;--bd:#2d323b;--ac:#4f8cff}}
+*{box-sizing:border-box}
+body{margin:0;font:16px/1.4 -apple-system,system-ui,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--fg);
+padding:env(safe-area-inset-top) env(safe-area-inset-right) calc(env(safe-area-inset-bottom) + 24px) env(safe-area-inset-left)}
+main{max-width:640px;margin:0 auto;padding:12px}
+h1{font-size:22px;margin:8px 0 12px}
+section{background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:12px;margin-bottom:12px}
+h2{font-size:13px;text-transform:uppercase;letter-spacing:.05em;color:var(--mut);margin:0 0 8px}
+button,select,input{font:inherit;color:var(--fg)}
+button{background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:9px 12px;cursor:pointer}
+button.p{background:var(--ac);border-color:var(--ac);color:#fff;font-weight:600}
+button:disabled{opacity:.45}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.row>*{flex:0 0 auto}
+select,input[type=number]{background:var(--bg);border:1px solid var(--bd);border-radius:8px;padding:8px;min-width:0}
+label{display:flex;flex-direction:column;gap:3px;font-size:13px;color:var(--mut)}
+.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+input[type=number]{width:100%}
+.chk{flex-direction:row;align-items:center;gap:8px;font-size:15px;color:var(--fg);margin:10px 0}
+.item{display:flex;align-items:center;gap:8px;padding:6px 0;border-top:1px solid var(--bd)}
+.item:first-child{border-top:0}
+.item img{width:44px;height:44px;object-fit:cover;border-radius:6px;background:var(--bd)}
+.item span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.item button{padding:6px 10px}
+.note{font-size:13px;color:var(--mut);margin:8px 0 0}
+#empty{color:var(--mut);text-align:center;padding:16px 0}
+</style>
+</head>
+<body>
+<main>
+<h1>JPEG → PDF</h1>
+
+<section>
+  <h2>Images <span id="count"></span></h2>
+  <div class="row">
+    <button class="p" id="add">Add images</button>
+    <button id="az">Sort A→Z</button>
+    <button id="za">Sort Z→A</button>
+    <button id="clear">Clear</button>
+  </div>
+  <input type="file" id="file" accept="image/*" multiple hidden>
+  <div id="list"><div id="empty">No images yet</div></div>
+</section>
+
+<section>
+  <h2>Page</h2>
+  <div class="grid">
+    <label>Paper size
+      <select id="paper">
+        <option>Original image size</option><option>A3</option>
+        <option>A4</option><option>A5</option><option>Letter</option><option>Legal</option>
+      </select>
+    </label>
+    <label>Orientation
+      <select id="orient"><option value="auto">Auto (match image)</option><option value="p">Portrait</option><option value="l">Landscape</option></select>
+    </label>
+    <label>Margin unit
+      <select id="unit"><option>mm</option><option>cm</option><option>inch</option><option>pt</option></select>
+    </label>
+    <label>Original size DPI
+      <input type="number" id="dpi" value="72" min="20" max="600">
+    </label>
+  </div>
+  <label class="chk"><input type="checkbox" id="same" checked> Same margin on all sides</label>
+  <div class="grid4">
+    <label>Top<input type="number" id="mt" value="0" min="0" step="any" inputmode="decimal"></label>
+    <label>Bottom<input type="number" id="mb" value="0" min="0" step="any" inputmode="decimal"></label>
+    <label>Left<input type="number" id="ml" value="0" min="0" step="any" inputmode="decimal"></label>
+    <label>Right<input type="number" id="mr" value="0" min="0" step="any" inputmode="decimal"></label>
+  </div>
+  <p class="note" id="note"></p>
+</section>
+
+<section>
+  <div class="row"><button class="p" id="go" style="width:100%">Convert to PDF</button></div>
+  <div id="result" hidden>
+    <p id="msg" class="note"></p>
+    <div class="row"><button class="p" id="share">Save / Share PDF</button><a id="open" target="_blank"><button>Open</button></a></div>
+  </div>
+</section>
+<p class="note" style="text-align:center">Everything runs on your device. Nothing is uploaded.</p>
+</main>
+
+<script>
+const $ = s => document.querySelector(s);
+const UNITS = {mm: 72/25.4, cm: 72/2.54, inch: 72, pt: 1};
+const PAPER = {A3:[841.89,1190.55], A4:[595.28,841.89], A5:[419.53,595.28], Letter:[612,792], Legal:[612,1008]};
+let items = [], nextId = 0, pdfFile = null;
+
+const load = async file => {
+  const url = URL.createObjectURL(file), img = new Image();
+  img.src = url; await img.decode();
+  return {img, url};
+};
+
+async function addFiles(files) {
+  for (const f of files) {
+    try {
+      const {img, url} = await load(f);
+      const s = 88 / Math.min(img.naturalWidth, img.naturalHeight);
+      const c = document.createElement('canvas');
+      c.width = Math.max(1, Math.round(img.naturalWidth * s)); c.height = Math.max(1, Math.round(img.naturalHeight * s));
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      items.push({id: nextId++, file: f, name: f.name, thumb: c.toDataURL('image/jpeg', .6)});
+      URL.revokeObjectURL(url); c.width = c.height = 0;
+    } catch (e) { alert('Could not read ' + f.name); }
+    render();
+  }
+}
+
+function render() {
+  $('#count').textContent = items.length ? `(${items.length})` : '';
+  $('#list').innerHTML = items.length ? items.map((it, i) => `
+    <div class="item"><img src="${it.thumb}" alt=""><span>${it.name.replace(/</g,'&lt;')}</span>
+    <button data-i="${i}" data-a="up">↑</button><button data-i="${i}" data-a="down">↓</button><button data-i="${i}" data-a="del">✕</button></div>`).join('')
+    : '<div id="empty">No images yet</div>';
+}
+
+$('#list').onclick = e => {
+  const b = e.target.closest('button'); if (!b) return;
+  const i = +b.dataset.i, a = b.dataset.a;
+  if (a === 'del') items.splice(i, 1);
+  else { const j = a === 'up' ? i - 1 : i + 1; if (j >= 0 && j < items.length) [items[i], items[j]] = [items[j], items[i]]; }
+  render();
+};
+const sortBy = dir => { items.sort((a, b) => dir * a.name.localeCompare(b.name, undefined, {numeric: true, sensitivity: 'base'})); render(); };
+$('#az').onclick = () => sortBy(1);
+$('#za').onclick = () => sortBy(-1);
+$('#clear').onclick = () => { items = []; render(); };
+$('#add').onclick = () => $('#file').click();
+$('#file').onchange = e => { addFiles([...e.target.files]); e.target.value = ''; };
+
+// margins / UI state
+const mIn = ['#mt', '#mb', '#ml', '#mr'].map($);
+function syncUI() {
+  const orig = $('#paper').value === 'Original image size';
+  $('#orient').disabled = orig; $('#dpi').disabled = !orig;
+  if ($('#same').checked) mIn.slice(1).forEach(m => { m.value = mIn[0].value; m.disabled = true; });
+  else mIn.slice(1).forEach(m => m.disabled = false);
+  $('#note').textContent = orig
+    ? "Each page is the image's own size plus your margins (image is not scaled)."
+    : 'Images are scaled to fit inside the margins, keeping proportions, and centered.';
+}
+['#paper', '#same'].forEach(s => $(s).onchange = syncUI);
+$('#mt').oninput = syncUI;
+syncUI();
+
+// ---- Minimal PDF writer (embeds JPEG data directly) ----
+function buildPdf(pages) {
+  const enc = new TextEncoder(), parts = [], off = [];
+  let len = 0;
+  const push = d => { const u = typeof d === 'string' ? enc.encode(d) : d; parts.push(u); len += u.length; };
+  const start = n => { off[n] = len; push(`${n} 0 obj\n`); };
+  const f = n => +n.toFixed(2);
+  push('%PDF-1.4\n');
+  start(1); push('<< /Type /Catalog /Pages 2 0 R >>\nendobj\n');
+  start(2); push(`<< /Type /Pages /Count ${pages.length} /Kids [${pages.map((_, i) => `${3 + 3 * i} 0 R`).join(' ')}] >>\nendobj\n`);
+  pages.forEach((p, i) => {
+    const pg = 3 + 3 * i, ct = pg + 1, im = pg + 2;
+    start(pg); push(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${f(p.pw)} ${f(p.ph)}] /Resources << /XObject << /Im0 ${im} 0 R >> >> /Contents ${ct} 0 R >>\nendobj\n`);
+    const cs = `q ${f(p.dw)} 0 0 ${f(p.dh)} ${f(p.x)} ${f(p.y)} cm /Im0 Do Q`;
+    start(ct); push(`<< /Length ${cs.length} >>\nstream\n${cs}\nendstream\nendobj\n`);
+    start(im); push(`<< /Type /XObject /Subtype /Image /Width ${p.cw} /Height ${p.ch} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${p.bytes.length} >>\nstream\n`);
+    push(p.bytes); push('\nendstream\nendobj\n');
+  });
+  const n = 3 + 3 * pages.length, xref = len;
+  push(`xref\n0 ${n}\n0000000000 65535 f \n`);
+  for (let i = 1; i < n; i++) push(String(off[i]).padStart(10, '0') + ' 00000 n \n');
+  push(`trailer\n<< /Size ${n} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF`);
+  return new Blob(parts, {type: 'application/pdf'});
+}
+
+$('#go').onclick = async () => {
+  if (!items.length) return alert('Add some images first.');
+  const k = UNITS[$('#unit').value], m = i => Math.max(0, parseFloat(mIn[i].value) || 0) * k;
+  const M = {t: m(0), b: m(1), l: m(2), r: m(3)};
+  const paper = $('#paper').value, orient = $('#orient').value, dpi = Math.max(1, +$('#dpi').value || 72);
+  const btn = $('#go'); btn.disabled = true; $('#result').hidden = true;
+  try {
+    const pages = [];
+    for (let n = 0; n < items.length; n++) {
+      btn.textContent = `Converting ${n + 1} / ${items.length}…`;
+      await new Promise(r => setTimeout(r, 0));
+      const {img, url} = await load(items[n].file);
+      const W = img.naturalWidth, H = img.naturalHeight;
+      const s = Math.min(1, Math.sqrt(16e6 / (W * H)));  // stay under iOS canvas limit
+      const c = document.createElement('canvas');
+      c.width = Math.round(W * s); c.height = Math.round(H * s);
+      const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height);
+      g.drawImage(img, 0, 0, c.width, c.height);
+      const blob = await new Promise(r => c.toBlob(r, 'image/jpeg', .92));
+      const bytes = new Uint8Array(await blob.arrayBuffer());
+      const cw = c.width, ch = c.height;
+      URL.revokeObjectURL(url); c.width = c.height = 0;
+
+      let pw, ph, dw, dh, x, y;
+      if (paper === 'Original image size') {
+        dw = W / dpi * 72; dh = H / dpi * 72;
+        pw = dw + M.l + M.r; ph = dh + M.t + M.b; x = M.l; y = M.b;
+      } else {
+        let [a, b] = PAPER[paper]; const lo = Math.min(a, b), hi = Math.max(a, b);
+        const land = orient === 'l' || (orient === 'auto' && W > H);
+        [pw, ph] = land ? [hi, lo] : [lo, hi];
+        const bw = Math.max(1, pw - M.l - M.r), bh = Math.max(1, ph - M.t - M.b), sc = Math.min(bw / W, bh / H);
+        dw = W * sc; dh = H * sc; x = M.l + (bw - dw) / 2; y = M.b + (bh - dh) / 2;
+      }
+      pages.push({pw, ph, dw, dh, x, y, cw, ch, bytes});
+    }
+    const blob = buildPdf(pages);
+    pdfFile = new File([blob], 'images.pdf', {type: 'application/pdf'});
+    if ($('#open').href) URL.revokeObjectURL($('#open').href);
+    $('#open').href = URL.createObjectURL(blob);
+    $('#msg').textContent = `Done: ${pages.length} page(s), ${(blob.size / 1048576).toFixed(1)} MB.`;
+    $('#result').hidden = false;
+  } catch (e) {
+    alert('Could not create the PDF: ' + e.message);
+  }
+  btn.disabled = false; btn.textContent = 'Convert to PDF';
+};
+
+// Fresh tap needed for share sheet on iOS, hence a separate button
+$('#share').onclick = async () => {
+  if (!pdfFile) return;
+  try {
+    if (navigator.canShare && navigator.canShare({files: [pdfFile]})) await navigator.share({files: [pdfFile]});
+    else { const a = document.createElement('a'); a.href = $('#open').href; a.download = 'images.pdf'; a.click(); }
+  } catch (e) { /* user cancelled */ }
+};
+
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
+</script>
+</body>
+</html>
