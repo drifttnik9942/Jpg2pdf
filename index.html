@@ -53,7 +53,7 @@ input[type=number]{width:100%}
     <button id="za">Sort Z→A</button>
     <button id="clear">Clear</button>
   </div>
-  <input type="file" id="file" accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp" multiple hidden>
+  <input type="file" id="file" accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp,.cbz,.cbr,.zip,.rar" multiple hidden>
   <div id="list"><div id="empty">No images yet</div></div>
 </section>
 
@@ -93,9 +93,10 @@ input[type=number]{width:100%}
     <div class="row"><button class="p" id="share">Save / Share PDF</button><a id="open" target="_blank"><button>Open</button></a></div>
   </div>
 </section>
-<p class="note" style="text-align:center">JPEG, PNG and WebP supported (transparency becomes white). Everything runs on your device. Nothing is uploaded.</p>
+<p class="note" style="text-align:center">JPEG, PNG, WebP, CBZ and CBR supported (transparency becomes white). Everything runs on your device. Nothing is uploaded.</p>
 </main>
 
+<script src="fflate.min.js"></script>
 <script>
 const $ = s => document.querySelector(s);
 const UNITS = {mm: 72/25.4, cm: 72/2.54, inch: 72, pt: 1};
@@ -108,19 +109,66 @@ const load = async file => {
   return {img, url};
 };
 
-async function addFiles(files) {
-  for (const f of files) {
+const IMG_RE = /\.(jpe?g|png|webp)$/i, ARC_RE = /\.(cbz|cbr|zip|rar)$/i;
+const MIME = {jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp'};
+const mimeOf = n => MIME[n.split('.').pop().toLowerCase()] || '';
+const natSort = (a, b) => a.path.localeCompare(b.path, undefined, {numeric: true, sensitivity: 'base'});
+
+// Returns [{path, file}] of the images inside a CBZ/CBR (zip or rar, detected by content)
+async function extractArchive(file) {
+  const head = new Uint8Array(await file.slice(0, 4).arrayBuffer());
+  const out = [];
+  if (head[0] === 0x50 && head[1] === 0x4b) {            // "PK" = zip / cbz
+    const u8 = new Uint8Array(await file.arrayBuffer());
+    const files = await new Promise((res, rej) => fflate.unzip(u8,
+      {filter: f => IMG_RE.test(f.name) && !/(^|\/)(__MACOSX|\._)/.test(f.name)},
+      (e, d) => e ? rej(e) : res(d)));
+    for (const [path, data] of Object.entries(files)) {
+      const name = path.split('/').pop();
+      out.push({path, file: new File([data], name, {type: mimeOf(name)})});
+    }
+  } else {                                               // RAR / cbr
+    const {Archive} = await import('./libarchive/libarchive.js');
+    Archive.init({workerUrl: 'libarchive/worker-bundle.js'});
+    const ar = await Archive.open(file);
+    const walk = (o, pre) => { for (const [k, v] of Object.entries(o)) {
+      if (v instanceof Blob) { if (IMG_RE.test(k) && !k.startsWith('._')) out.push({path: pre + k, file: new File([v], k, {type: mimeOf(k)})}); }
+      else walk(v, pre + k + '/'); } };
+    walk(await ar.extractFiles(), '');
+    try { await ar.close(); } catch (e) {}
+  }
+  return out.sort(natSort);
+}
+
+async function addImages(list) {
+  for (const it of list) {
     try {
-      const {img, url} = await load(f);
+      const {img, url} = await load(it.file);
       const s = 88 / Math.min(img.naturalWidth, img.naturalHeight);
       const c = document.createElement('canvas');
       c.width = Math.max(1, Math.round(img.naturalWidth * s)); c.height = Math.max(1, Math.round(img.naturalHeight * s));
       c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
-      items.push({id: nextId++, file: f, name: f.name, thumb: c.toDataURL('image/jpeg', .6)});
+      items.push({id: nextId++, file: it.file, name: it.name, thumb: c.toDataURL('image/jpeg', .6)});
       URL.revokeObjectURL(url); c.width = c.height = 0;
-    } catch (e) { alert('Could not read ' + f.name); }
-    render();
+    } catch (e) { alert('Could not read ' + it.name); }
+    if (items.length % 5 === 0) render();
   }
+  render();
+}
+
+async function addFiles(files) {
+  for (const f of files) {
+    if (ARC_RE.test(f.name)) {
+      try {
+        $('#count').textContent = `(extracting ${f.name}…)`;
+        const pages = await extractArchive(f);
+        if (!pages.length) { alert('No JPEG/PNG/WebP images found in ' + f.name); continue; }
+        const base = f.name.replace(/\.[^.]+$/, '');
+        await addImages(pages.map(p => ({file: p.file, name: base + '/' + p.path})));
+      } catch (e) { alert('Could not open ' + f.name + ': ' + (e.message || e)); }
+    } else await addImages([{file: f, name: f.name}]);
+  }
+  render();
 }
 
 function render() {
