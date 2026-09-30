@@ -7,5 +7,5 @@
 
 When you change files, bump `CACHE` in sw.js (e.g. jpeg2pdf-v4) so phones pick up the update.
 
-Upload the `libarchive` folder too (keep the folder structure). It is needed for real CBR (RAR) files.
+Upload libarchive.js, worker-bundle.js and libarchive.wasm too (all in the repo root, no folders). They are needed for real CBR (RAR) files.
 CBZ files and most .cbr files that are secretly zips work without it.

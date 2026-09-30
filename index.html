@@ -130,8 +130,8 @@ async function extractArchive(file) {
       out.push({path, file: new File([data], name, {type: mimeOf(name)})});
     }
   } else {                                               // RAR / cbr
-    const {Archive} = await import('./libarchive/libarchive.js');
-    Archive.init({workerUrl: 'libarchive/worker-bundle.js'});
+    const {Archive} = await import('./libarchive.js');
+    Archive.init({workerUrl: 'worker-bundle.js'});
     const ar = await Archive.open(file);
     const walk = (o, pre) => { for (const [k, v] of Object.entries(o)) {
       if (v instanceof Blob) { if (IMG_RE.test(k) && !k.startsWith('._')) out.push({path: pre + k, file: new File([v], k, {type: mimeOf(k)})}); }
