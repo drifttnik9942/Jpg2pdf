@@ -3,13 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>JPEG to PDF</title>
+<title>Images to PDF</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icon-180.png">
 <meta name="theme-color" content="#2563eb">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="JPEG→PDF">
+<meta name="apple-mobile-web-app-title" content="Images→PDF">
 <style>
 :root{--bg:#f4f5f7;--card:#fff;--fg:#111827;--mut:#6b7280;--bd:#d9dce1;--ac:#2563eb}
 @media(prefers-color-scheme:dark){:root{--bg:#0f1115;--card:#1a1d23;--fg:#f3f4f6;--mut:#9ca3af;--bd:#2d323b;--ac:#4f8cff}}
@@ -43,7 +43,7 @@ input[type=number]{width:100%}
 </head>
 <body>
 <main>
-<h1>JPEG → PDF</h1>
+<h1>Images → PDF</h1>
 
 <section>
   <h2>Images <span id="count"></span></h2>
@@ -53,7 +53,7 @@ input[type=number]{width:100%}
     <button id="za">Sort Z→A</button>
     <button id="clear">Clear</button>
   </div>
-  <input type="file" id="file" accept="image/*" multiple hidden>
+  <input type="file" id="file" accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp" multiple hidden>
   <div id="list"><div id="empty">No images yet</div></div>
 </section>
 
@@ -93,7 +93,7 @@ input[type=number]{width:100%}
     <div class="row"><button class="p" id="share">Save / Share PDF</button><a id="open" target="_blank"><button>Open</button></a></div>
   </div>
 </section>
-<p class="note" style="text-align:center">Everything runs on your device. Nothing is uploaded.</p>
+<p class="note" style="text-align:center">JPEG, PNG and WebP supported (transparency becomes white). Everything runs on your device. Nothing is uploaded.</p>
 </main>
 
 <script>

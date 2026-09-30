@@ -1,6 +1,6 @@
 {
-  "name": "JPEG to PDF",
-  "short_name": "JPEG→PDF",
+  "name": "Images to PDF",
+  "short_name": "Images→PDF",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
